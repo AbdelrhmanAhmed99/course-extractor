@@ -2,7 +2,6 @@ import streamlit as st
 import json
 import time
 from test8 import extract_course_details
-from dotenv import load_dotenv
 import os
 from urllib.parse import urlparse
 
@@ -196,10 +195,10 @@ st.title("🎓 Course Extractor")
 st.markdown("Extract detailed course information from university websites")
 
 # Load API key
-load_dotenv()
-API_KEY = os.getenv("FIRECRAWL_API_KEY")
+# Load API key from Streamlit secrets
+API_KEY = st.secrets.get("FIRECRAWL_API_KEY")
 if not API_KEY:
-    st.error("❌ FIRECRAWL_API_KEY not set in .env file")
+    st.error("❌ FIRECRAWL_API_KEY not set in Streamlit secrets. Please add it in the app settings.")
     st.stop()
 
 fc = FirecrawlClient(api_key=API_KEY)
