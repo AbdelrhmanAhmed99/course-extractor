@@ -70,30 +70,6 @@ st.markdown("""
         margin: 10px 0;
     }
     
-    .stats-container {
-        display: flex;
-        justify-content: space-around;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
-        border-radius: 15px;
-        margin: 20px 0;
-    }
-    
-    .stat-item {
-        text-align: center;
-        color: white;
-    }
-    
-    .stat-number {
-        font-size: 2rem;
-        font-weight: bold;
-        display: block;
-    }
-    
-    .stat-label {
-        font-size: 0.9rem;
-        opacity: 0.8;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -167,14 +143,6 @@ def create_course_card(course, index):
         if course.get('source_url'):
             st.link_button("🔗 View Original", course['source_url'], use_container_width=True)
 
-        st.download_button(
-            label="📥 Download JSON",
-            data=course_json,
-            file_name=f"course_{index+1}.json",
-            mime="application/json",
-            use_container_width=True,
-            key=f"download_course_{index}_{int(time.time() * 1000)}"
-        )
 
     # Show raw JSON in an expander for debugging
     with st.expander(f"🛠️ Raw Data - {course.get('course_name', 'Course')}"):
@@ -195,10 +163,30 @@ st.title("🎓 Course Extractor")
 st.markdown("Extract detailed course information from university websites")
 
 # Load API key
-# Load API key from Streamlit secrets
-API_KEY = st.secrets.get("FIRECRAWL_API_KEY")
+# Try to get API key from Streamlit secrets first, then environment variables
+API_KEY = None
+try:
+    API_KEY = st.secrets.get("FIRECRAWL_API_KEY")
+except:
+    pass
+
 if not API_KEY:
-    st.error("❌ FIRECRAWL_API_KEY not set in Streamlit secrets. Please add it in the app settings.")
+    API_KEY = os.getenv("FIRECRAWL_API_KEY")
+
+if not API_KEY:
+    st.error("❌ FIRECRAWL_API_KEY not found!")
+    st.markdown("""
+    **Please set your Firecrawl API key in one of these ways:**
+    
+    1. **Using Streamlit Secrets (Recommended):**
+       - Edit `.streamlit/secrets.toml` file
+       - Add: `FIRECRAWL_API_KEY = "your_api_key_here"`
+    
+    2. **Using Environment Variable:**
+       - Set: `FIRECRAWL_API_KEY=your_api_key_here`
+    
+    **Get your API key from:** https://firecrawl.dev/
+    """)
     st.stop()
 
 fc = FirecrawlClient(api_key=API_KEY)
@@ -223,21 +211,6 @@ url_input = st.text_area(
     help="Enter university course page URLs, one per line"
 )
 
-# Sample URLs button
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    if st.button("📝 Load Sample URLs", use_container_width=True):
-        sample_urls = """https://www.liverpool.ac.uk/courses/accounting-and-finance-bsc-hons
-https://www.leedsbeckett.ac.uk/courses/applied-sports-studies-tennis-bsc
-https://www.leedsbeckett.ac.uk/courses/accounting-finance-ba
-https://www.brighton.ac.uk/courses/study/secondary-biology-pgce.aspx
-https://www.hw.ac.uk/study/postgraduate/actuarial-management-with-data-science"""
-        st.session_state.sample_urls = sample_urls
-        st.rerun()
-
-if 'sample_urls' in st.session_state:
-    url_input = st.session_state.sample_urls
-    del st.session_state.sample_urls
 
 # -----------------------------
 # Extract Button (Always Visible)
@@ -326,19 +299,6 @@ with col2:
         if results:
             st.session_state.courses_data = results
             
-            # Show download all button
-            with results_container:
-                col1, col2, col3 = st.columns([1, 1, 1])
-                with col2:
-                    all_courses_json = json.dumps(results, indent=2, ensure_ascii=False)
-                    st.download_button(
-                        label="📥 Download All Results",
-                        data=all_courses_json,
-                        file_name="extracted_courses_batch.json",
-                        mime="application/json",
-                        use_container_width=True,
-                        key="download_all_batch"
-                    )
 
 # -----------------------------
 # Clear Results Button
@@ -356,88 +316,21 @@ if st.session_state.courses_data:
 if st.session_state.courses_data:
     results = st.session_state.courses_data
     
-    # Statistics
-    st.markdown(f"""
-    <div class="stats-container">
-        <div class="stat-item">
-            <span class="stat-number">{len(results)}</span>
-            <span class="stat-label">Courses Extracted</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-number">{len(set(course.get('university', 'Unknown') for course in results))}</span>
-            <span class="stat-label">Universities</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-number">{len(set(course.get('degree_type', 'Unknown') for course in results))}</span>
-            <span class="stat-label">Degree Types</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
     
-    # Action buttons
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        # Download all results
-        all_courses_json = json.dumps(results, indent=2, ensure_ascii=False)
-        st.download_button(
-            label="📥 Download All Results",
-            data=all_courses_json,
-            file_name="extracted_courses.json",
-            mime="application/json",
-            use_container_width=True
-        )
-    
+    # Clear results button
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         if st.button("🗑️ Clear Results", use_container_width=True):
             st.session_state.courses_data = []
             st.rerun()
-    
-    with col3:
-        # Save to file button
-        if st.button("💾 Save to File", use_container_width=True):
-            with open("courses_extracted.json", "w", encoding="utf-8") as f:
-                json.dump(results, f, indent=2, ensure_ascii=False)
-            st.success("✅ Saved to courses_extracted.json")
     
     st.markdown("---")
     
     # Display course cards
     st.subheader("📚 Extracted Courses")
     
-    # Filter options
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        universities = sorted(set(course.get('university', 'Unknown') for course in results))
-        selected_uni = st.selectbox("🏛️ Filter by University", ['All'] + universities)
-    
-    with col2:
-        degree_types = sorted(set(course.get('degree_type', 'Unknown') for course in results))
-        selected_degree = st.selectbox("🎯 Filter by Degree Type", ['All'] + degree_types)
-    
-    with col3:
-        sort_by = st.selectbox("🔄 Sort by", ['Course Name', 'University', 'Degree Type'])
-    
-    # Apply filters
-    filtered_results = results
-    if selected_uni != 'All':
-        filtered_results = [c for c in filtered_results if c.get('university') == selected_uni]
-    if selected_degree != 'All':
-        filtered_results = [c for c in filtered_results if c.get('degree_type') == selected_degree]
-    
-    # Apply sorting
-    if sort_by == 'Course Name':
-        filtered_results = sorted(filtered_results, key=lambda x: x.get('course_name', ''))
-    elif sort_by == 'University':
-        filtered_results = sorted(filtered_results, key=lambda x: x.get('university', ''))
-    elif sort_by == 'Degree Type':
-        filtered_results = sorted(filtered_results, key=lambda x: x.get('degree_type', ''))
-    
-    st.write(f"Showing {len(filtered_results)} of {len(results)} courses")
-    
-    # Display filtered courses
-    for i, course in enumerate(filtered_results):
+    # Display all courses
+    for i, course in enumerate(results):
         create_course_card(course, i)
 
 # -----------------------------
